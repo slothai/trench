@@ -54,17 +54,43 @@ module Init(R: real) = {
     -- See: https://futhark-lang.org/docs/doc/futlib/random.html#examples
 
     -- Generate 1-d array of uniformly distributed numbers
-    let uni1 (seed: []i32) (d1: i32): [d1]t =
+    let uni1 (seed: []i32) (range: (R.t, R.t)) (d1: i32): [d1]t =
         let rng = minstd_rand.rng_from_seed seed
         let rngs = minstd_rand.split_rng d1 rng
-        let (_, xs) = unzip (map (\rng -> uni.rand (R.i32 0, R.i32 1) rng) rngs)
+        let (_, xs) = unzip (map (\rng -> uni.rand range rng) rngs)
+        in xs
+
+    let norm1 (seed: []i32) (params: {mean:R.t, stddev:R.t}) (d1: i32): [d1]t =
+        let rng = minstd_rand.rng_from_seed seed
+        let rngs = minstd_rand.split_rng d1 rng
+        let (_, xs) = unzip (map (\rng -> norm.rand params rng) rngs)
         in xs
 
     -- For 2/3/4-d arrays it's possible to generate a random 1-d array and unflatten it
     -- Array functions: https://futhark-lang.org/docs/doc/futlib/array.html
-    -- COmment from the author: https://github.com/diku-dk/futhark/issues/520
+    -- Comment from the author: https://github.com/diku-dk/futhark/issues/520
 
-    let uni2 (seed: []i32) (d1: i32) (d2: i32): [d1][d2]t = unflatten d1 d2 (uni1 seed (d1*d2))
+    -- Initialization He and Glorot: https://mmuratarat.github.io/2019-02-25/xavier-glorot-he-weight-init
+
+    let glorot_uniform (seed: []i32) (d1: i32) (d2: i32): [d1][d2]t =
+        let limit = R.(sqrt((i32 6) / (i32 d1 + i32 d2)))
+        let range = (R.(negate limit), limit)
+        in unflatten d1 d2 (uni1 seed range (d1*d2))
+
+    let glorot_norm (seed: []i32) (d1: i32) (d2: i32): [d1][d2]t =
+        let std = R.(sqrt((i32 2) / (i32 d1 + i32 d2)))
+        in unflatten d1 d2 (norm1 seed {mean=(R.i32 0), stddev=std} (d1*d2))
+
+    let he_uiform (seed: []i32) (d1: i32) (d2: i32): [d1][d2]t =
+        let limit = R.(sqrt((i32 12) / (i32 d1 + i32 d2)))
+        let range = (R.(negate limit), limit)
+        in unflatten d1 d2 (uni1 seed range (d1*d2))
+
+    let he_norm (seed: []i32) (d1: i32) (d2: i32): [d1][d2]t =
+        let std = R.(sqrt((i32 4) / (i32 d1 + i32 d2)))
+        in unflatten d1 d2 (norm1 seed {mean=(R.i32 0), stddev=std} (d1*d2))
+
+    let zeros (d1: i32): [d1]t = replicate d1 (R.i32 0)
 }
 
 module Dense(T: field) = {
