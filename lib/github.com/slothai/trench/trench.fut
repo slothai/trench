@@ -1,4 +1,5 @@
 import "../../diku-dk/linalg/linalg"
+import "../../diku-dk/cpprandom/random"
 
 -- https://futhark-lang.org/docs/doc/futlib/math.html
 module type field = {
@@ -8,6 +9,7 @@ module type field = {
     val *: t -> t -> t
     val /: t -> t -> t
     val i32: i32 -> t
+    val f32: f32 -> t
 }
 
 -- Usually weight_t would be f32 or f64
@@ -42,6 +44,28 @@ type^ forwards 'input 'w 'output 'cache = w -> input -> (output, cache)
 type^ NN 'input 'w 'output 'cache = { forward : forwards input w output cache, weights : w}
 
 type^ activation_func 'o = {f:o -> o, prime:o -> o}
+
+module Init(R: real) = {
+    type t = R.t
+
+    module uni = uniform_real_distribution R minstd_rand
+    module norm = normal_distribution R minstd_rand
+
+    -- See: https://futhark-lang.org/docs/doc/futlib/random.html#examples
+
+    -- Generate 1-d array of uniformly distributed numbers
+    let uni1 (seed: []i32) (d1: i32): [d1]t =
+        let rng = minstd_rand.rng_from_seed seed
+        let rngs = minstd_rand.split_rng d1 rng
+        let (_, xs) = unzip (map (\rng -> uni.rand (R.i32 0, R.i32 1) rng) rngs)
+        in xs
+
+    -- For 2/3/4-d arrays it's possible to generate a random 1-d array and unflatten it
+    -- Array functions: https://futhark-lang.org/docs/doc/futlib/array.html
+    -- COmment from the author: https://github.com/diku-dk/futhark/issues/520
+
+    let uni2 (seed: []i32) (d1: i32) (d2: i32): [d1][d2]t = unflatten d1 d2 (uni1 seed (d1*d2))
+}
 
 module Dense(T: field) = {
     type t = T.t
