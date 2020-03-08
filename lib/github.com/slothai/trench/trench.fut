@@ -93,24 +93,25 @@ module Init(R: real) = {
     let zeros (d1: i32): [d1]t = replicate d1 (R.i32 0)
 }
 
-module Dense(T: field) = {
-    type t = T.t
+module Dense(R: real) = {
+    type t = R.t
 
-    module linalg   = mk_linalg T
+    module linalg   = mk_linalg R
+    module init_weights = Init R
 
     let forward (m: i32) (nin: i32) (nout: i32)
                 (w: [nin][nout]t) (b: [nout]t)
                 (input: [m][nin]t) =
         let res = linalg.matmul input w
-        let res_with_bias = map (\x -> map2 (T.+) x b) res
+        let res_with_bias = map (\x -> map2 (R.+) x b) res
         in res_with_bias
 
     let init nin nout =
-        let w = replicate nin (replicate nout (T.i32 0))
-        let b = replicate nout (T.i32 0)
+        let w = init_weights.he_norm [312] nin nout
+        let b = init_weights.zeros nout
         in
         {
             forward = \m -> forward m nin nout w b,
             weights = (w, b)
-        } 
+        }
 }
